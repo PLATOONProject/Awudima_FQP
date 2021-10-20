@@ -1,0 +1,2 @@
+
+from awudima.qtranslator.translator import GenericTranslator
