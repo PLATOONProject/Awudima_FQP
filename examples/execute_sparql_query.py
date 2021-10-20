@@ -74,7 +74,7 @@ if __name__ == '__main__':
     for row in resultSet.get():
         print(row)
 
-    # OR get SPARQL-JSON Result formated json object
+    # OR get SPARQL-JSON Result formatted as json object
     results = resultSet.results
 
     print(results)
