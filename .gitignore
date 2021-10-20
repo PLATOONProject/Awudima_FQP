@@ -1,0 +1,8 @@
+build/
+.idea/
+.ipynb_checkpoints
+.pyc
+dist/
+venv/
+pandasenv/
+scripts/
