@@ -6,3 +6,4 @@ dist/
 venv/
 pandasenv/
 scripts/
+__pycache__
