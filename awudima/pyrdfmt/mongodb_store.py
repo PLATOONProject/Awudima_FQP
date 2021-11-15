@@ -109,7 +109,6 @@ class MongoLDFlattenRDFMT:
             self.port = 27017
 
     def contact_mongo_client(self, pipeline, collection_name, client):
-
         db = client.get_database(self.database_name)
         collection = db.get_collection(collection_name)
         result = collection.aggregate(pipeline, useCursor=True, batchSize=1000, allowDiskUse=True)
@@ -132,13 +131,12 @@ class MongoLDFlattenRDFMT:
         :param out_queue:
         :return:
         """
-
         self.extract_params(datasource)
 
         client = self.init_connection()
 
         pipeline = RDFMT_PIPELINE
-        db = client.get_database(datasource.name)
+        db = client.get_database(self.database_name)
         collections = db.list_collection_names()
         rdfmts = []
         rdfmts_by_collection = {}
