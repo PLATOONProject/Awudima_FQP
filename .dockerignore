@@ -1,0 +1,7 @@
+data/
+examples/
+venv/
+.git/
+.idea/
+build/
+dist/
