@@ -87,7 +87,8 @@ class SPARQLEndpointRDFMT:
                         card = card[:card.index('^^')]
                 pred = MTPredicate(p['p'].replace('\\', ""), label, desc=desc, cardinality=card)
 
-                ranges = self.get_predicate_ranges(endpoint, t, p['p'])
+                #ranges = self.get_predicate_ranges(endpoint, t, p['p'])
+                ranges = []
                 pred.addRanges(ranges)
                 rdfmt.addPredicate(pred, datasource)
 
@@ -543,8 +544,8 @@ class SPARQLEndpointRDFMT:
                 for ds in m1.datasources:
                     if ds.dstype != DataSourceType.SPARQL_ENDPOINT:
                         continue
-                    query = "SELECT DISTINCT ?p WHERE { ?s " + ds.typing_predicate + " " + m1.mtId + \
-                            " . ?s ?p ?o FILTER (" + filters_txt + ") } "
+                    query = "SELECT DISTINCT ?p WHERE { ?s " + ds.typing_predicate + " <" + m1.mtId + \
+                            "> . ?s ?p ?o FILTER (" + filters_txt + ") } "
                     result, status = SPARQLEndpointRDFMT.get_results_iter(query, ds.url, 10)
                     for p in result:
                         pred = p['p']
@@ -565,8 +566,8 @@ class SPARQLEndpointRDFMT:
                 for ds in m2.datasources:
                     if ds.dstype != DataSourceType.SPARQL_ENDPOINT:
                         continue
-                    query = "SELECT DISTINCT ?p WHERE { ?s " + ds.typing_predicate + " " + m2.mtId + \
-                            " . ?s ?p ?o FILTER (" + filters_txt + ") } "
+                    query = "SELECT DISTINCT ?p WHERE { ?s " + ds.typing_predicate + " <" + m2.mtId + \
+                            "> . ?s ?p ?o FILTER (" + filters_txt + ") } "
                     result, status = SPARQLEndpointRDFMT.get_results_iter(query, ds.url, 10)
                     for p in result:
                         pred = p['p']

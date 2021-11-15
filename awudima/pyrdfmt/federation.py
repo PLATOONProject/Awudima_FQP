@@ -20,7 +20,6 @@ class Federation(object):
         :param name: short name of the federation
         :param desc: short description of the intended domain or project the federation will serve
         """
-
         self.fedId = fedId
         self.name = name
         self.desc = desc
@@ -128,7 +127,7 @@ class Federation(object):
         #     save_unlinked_as = self.fedId.replace(':', '-').replace('/', '_') + 'no-interlinks.json'
         # self.dump_to_json(save_unlinked_as)
 
-        self.rdfmts = SPARQLEndpointRDFMT.get_interlinks(set(list(rdfmts_dict.values())))
+        #self.rdfmts = SPARQLEndpointRDFMT.get_interlinks(set(list(rdfmts_dict.values())))
         return self.rdfmts
 
     def dump_this_to_json(self, rdfmts, datasouce, fname):
@@ -183,7 +182,6 @@ class Federation(object):
 
         :return: text representation as fedId(name)
         """
-
         return self.fedId
 
     def addSource(self, source):
@@ -217,7 +215,6 @@ class Federation(object):
 
         :return: json representation of the Federation
         """
-
         return {
             "fedId": self.fedId,
             "name": self.name,

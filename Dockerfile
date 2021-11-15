@@ -22,5 +22,3 @@ ENV CONFIG_FILE /data/federation.json
 RUN chmod +x /Awudima_FQP/start_endpoint.sh
 
 CMD ["/Awudima_FQP/start_endpoint.sh"]
-
-# CMD ["tail", "-f", "/dev/null"]

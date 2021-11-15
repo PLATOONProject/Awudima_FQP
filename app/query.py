@@ -14,7 +14,12 @@ import logging
 from awudima import AwudimaFQP, Federation, DataSourceType
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 bp = Blueprint('query', __name__, url_prefix='/')
 
@@ -29,10 +34,9 @@ else:
 def sparql():
     if request.method == 'GET' or request.method == 'POST':
         try:
-            query = request.args.get("query", '')
-
+            query = request.args.get("query", None) if request.method == 'GET' else request.values.get("query", None)
             if os.path.exists(configfile):
-                federation = Federation.load_from_json(configfile)
+                federation = Federation.config(configfile)
             else:
                 return jsonify({
                                     "head": {
@@ -63,8 +67,7 @@ def sparql():
         except Exception as e:
             import sys
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            emsg = repr(traceback.format_exception(exc_type, exc_value,
-                                                   exc_traceback))
+            emsg = repr(traceback.format_exception(exc_type, exc_value, exc_traceback))
             logger.error("Exception  " + emsg)
             print("Exception: ", e)
             import pprint
@@ -141,10 +144,10 @@ def inspect():
             print("Exception: ", e)
             import pprint
             pprint.pprint(emsg)
-            return jsonify({'federation': None,
+            return jsonify({"federation": None,
                             "error": str(emsg)
                             })
     else:
-        return jsonify({'federation': None,
+        return jsonify({"federation": None,
                         "error": "Invalid HTTP request! Only GET and POST are supported!"
-                     })
+                        })

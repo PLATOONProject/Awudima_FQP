@@ -8,7 +8,12 @@ from awudima.pyrdfmt import Federation
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class AwudimaFQP(object):
@@ -79,7 +84,7 @@ class AwudimaFQP(object):
         except Exception as e:
             print("Exception while getting decomposed query: ", sparql_query)
             print(e)
-            logger.info("Exception while  getting decomposed query: " + str(sparql_query))
+            logger.info("Exception while getting decomposed query: " + str(sparql_query))
             logger.error(e)
             return None
 
@@ -106,8 +111,8 @@ class AwudimaFQP(object):
             return None
 
     class ResultSet(object):
-        def __init__(self, sparql_query, queue: Queue, decomposition, plan, keep_in_memory=False):
 
+        def __init__(self, sparql_query, queue: Queue, decomposition, plan, keep_in_memory=False):
             self.queue = queue
             self.sparql_query = sparql_query
             self.decomposition = decomposition
@@ -138,7 +143,6 @@ class AwudimaFQP(object):
             this property will force the retrieval of results from the queue and store in memory.
             :return:
             """
-
             if self.__retrieval_status == "Not Started":
                 res = list(self.get())
                 self.__result_buffer['results']['bindings'] = res
@@ -150,7 +154,7 @@ class AwudimaFQP(object):
                     query = queryParser.parse(self.sparql_query)
                     self.__result_buffer['head']['vars'] = query.getVars()
                 else:
-                    self.__result_buffer['head']['vars'] = [var[1:] for var in self.decomposition.args]
+                    self.__result_buffer['head']['vars'] = [str(var)[1:] for var in self.decomposition.args]
             return self.__retrieved_results
 
         @property
@@ -166,7 +170,7 @@ class AwudimaFQP(object):
                     query = queryParser.parse(self.sparql_query)
                     self.__result_buffer['head']['vars'] = query.getVars()
                 else:
-                    self.__result_buffer['head']['vars'] = [var[1:] for var in self.decomposition.args]
+                    self.__result_buffer['head']['vars'] = [str(var)[1:] for var in self.decomposition.args]
 
             if self.__retrieval_status == 'Interrupted':
                 message = "Data retrieval has been interrupted because of some Exception!"
@@ -201,7 +205,7 @@ class AwudimaFQP(object):
                         query = queryParser.parse(self.sparql_query)
                         self.__result_buffer['head']['vars'] = query.getVars()
                     else:
-                        self.__result_buffer['head']['vars'] = [var[1:] for var in self.decomposition.args]
+                        self.__result_buffer['head']['vars'] = [str(var)[1:] for var in self.decomposition.args]
                     while r != 'EOF':
                         self.__retrieved_results = i + 1
                         if self.keep_in_memory:
@@ -212,7 +216,6 @@ class AwudimaFQP(object):
                         i += 1
 
                     self.__retrieval_status = "Finished"
-
                 except Exception as ex:
                     print("Exception while retrieving results for the given query: ", self.sparql_query)
                     print(ex)
