@@ -7,50 +7,65 @@ from awudima.pyrml import RMLSource, DataSourceType
 from pymongo import MongoClient
 
 
-RDFMT_PIPELINE = [
-        {'$unwind': '$@graph'},
-        {'$unwind': '$@graph.@type'},
-        {'$group': {'_id': '$@graph.@type', "objs": {'$addToSet': '$$ROOT'}}},
-        {'$unwind': '$objs'},
-        {'$replaceRoot': {
-            'newRoot': {
-                '$mergeObjects': [
-                    {'rdftype': '$_id'},
-                    {'context': '$objs.@context'},
-                    {'graph': "$objs.@graph"}
-                ]
+RDFMT_PIPELINE_1 = [
+    {'$unwind': '$@graph'},
+    {'$unwind': '$@graph.@type'},
+    {'$project': {'type': '$@graph.@type'}}
+]
 
-            }
+RDFMT_PIPELINE_2 = [
+    {'$lookup': {
+        'from': 'collection_name',
+        'let': {'current_type': '$@graph.@type'},
+        'pipeline': [
+            {'$unwind': '$@graph'},
+            {'$unwind': '$@graph.@type'},
+            {'$match': {'$expr': {'$eq': ['$@graph.@type', 'type_name']}}},
+            {'$group': {'_id': '$@graph.@type', "objs": {'$addToSet': '$$ROOT'}}},
+        ],
+        'as': 'sub'}
+    },
+    {'$project': {'_id': 'type_name', 'objs': {'$first': '$sub.objs'}}},
+    {'$unwind': '$objs'},
+    {'$replaceRoot': {
+        'newRoot': {
+            '$mergeObjects': [
+                {'rdftype': '$_id'},
+                {'context': '$objs.@context'},
+                {'graph': "$objs.@graph"}
+            ]
         }
-        },
-        {'$project': {'rdftype': 1, 'arrayofkeyvalue': {'$objectToArray': '$graph'}, 'prefixes': '$context'}},
-        {'$unwind': '$arrayofkeyvalue'},
-        {'$replaceRoot': {'newRoot': {
-            '$mergeObjects': [{'rdftype': '$rdftype'}, {'prefixes': '$prefixes'}, '$arrayofkeyvalue']}}},
-        {'$lookup': {
-            'from': 'bms-controller',
-            'let': {'eval_id': '$v', 'prop': '$k'},
-            'pipeline': [
-                {'$unwind': '$@graph'},
-                {'$unwind': '$@graph.@type'},
-                {'$match': {'$expr': {'$and': [{'$eq': ['$@graph.@id', '$$eval_id']}, {'$ne': ['$$prop', '@id']},
-                                               {'$ne': ['$$prop', '@type']}]}}},
-                {'$project': {'_id': 0, 'range': '$@graph.@type'}}
-            ],
-            'as': 'ranges'
+    }},
+    {'$project': {'rdftype': 1, 'arrayofkeyvalue': {'$objectToArray': '$graph'}, 'prefixes': '$context'}},
+    {'$unwind': '$arrayofkeyvalue'},
+    {'$replaceRoot': {
+        'newRoot': {
+            '$mergeObjects': [{'rdftype': '$rdftype'}, {'prefixes': '$prefixes'}, '$arrayofkeyvalue']
         }
-        },
-        {'$match': {'$expr': {'$and': [{'$ne': ['$k', '@id']}, {'$ne': ['$k', '@type']}]}}},
-        {'$group': {
-            "_id": {'rdfmt': '$rdftype', 'prefixes': '$prefixes'},
-            'predicates': {'$addToSet': {'predicate': '$k', 'ranges': '$ranges.range'}},
-
-        }},
-        {'$unwind': {'path': '$predicates', 'preserveNullAndEmptyArrays': True}},
-        {'$replaceRoot': {
-            'newRoot': {'$mergeObjects': [{'rdfmt': '$_id.rdfmt'}, {'context': '$_id.prefixes'}, '$predicates']}}},
-        {'$unwind': {'path': '$ranges', 'preserveNullAndEmptyArrays': True}}
-    ]
+    }},
+    {'$lookup': {
+        'from': 'collection_name',
+        'let': {'eval_id': '$v', 'prop': '$k'},
+        'pipeline': [
+            {'$unwind': '$@graph'},
+            {'$unwind': '$@graph.@type'},
+            {'$match': {'$expr': {'$and': [{'$eq': ['$@graph.@id', '$$eval_id']}, {'$ne': ['$$prop', '@id']},
+                                           {'$ne': ['$$prop', '@type']}]}}},
+            {'$project': {'_id': 0, 'range': '$@graph.@type'}}
+        ],
+        'as': 'ranges'
+    }},
+    {'$match': {'$expr': {'$and': [{'$ne': ['$k', '@id']}, {'$ne': ['$k', '@type']}]}}},
+    {'$group': {
+        '_id': {'rdfmt': '$rdftype', 'prefixes': '$prefixes'},
+        'predicates': {'$addToSet': {'predicate': '$k', 'ranges': '$ranges.range'}}
+    }},
+    {'$unwind': {'path': '$predicates', 'preserveNullAndEmptyArrays': True}},
+    {'$replaceRoot': {
+        'newRoot': {'$mergeObjects': [{'rdfmt': '$_id.rdfmt'}, {'context': '$_id.prefixes'}, '$predicates']}
+    }},
+    {'$unwind': {'path': '$ranges', 'preserveNullAndEmptyArrays': True}}
+]
 
 
 class MongoLDFlattenRDFMT:
@@ -134,86 +149,93 @@ class MongoLDFlattenRDFMT:
         self.extract_params(datasource)
 
         client = self.init_connection()
+        dbms_version = client.server_info()["version"]
 
-        pipeline = RDFMT_PIPELINE
         db = client.get_database(self.database_name)
         collections = db.list_collection_names()
         rdfmts = []
         rdfmts_by_collection = {}
         sources_by_collection = {}
         for c in collections:
-            pipeline[8]['$lookup']['from'] = c
-            res, card = self.contact_mongo_client(pipeline, c, client)
-            for doc in res:
-                prefixes = doc['context']
+            pipeline = RDFMT_PIPELINE_2
+            pipeline[0]['$lookup']['from'] = c
+            pipeline[7]['$lookup']['from'] = c
+            res_types, card_types = self.contact_mongo_client(RDFMT_PIPELINE_1, c, client)
+            for doc_types in res_types:
+                type_ = doc_types['type']
+                pipeline[0]['$lookup']['pipeline'][2]['$match']['$expr']['$eq'][1] = type_
+                pipeline[1]['$project']['_id'] = type_
 
-                if 'ranges' in doc:
-                    range = doc['ranges']
-                else:
-                    range = None
+                res, card = self.contact_mongo_client(pipeline, c, client)
+                for doc in res:
+                    prefixes = doc['context']
 
-                rdfmt = doc['rdfmt']
-                if ':' in rdfmt and rdfmt.find(':') == rdfmt.rfind(':'):
-                    prefix = rdfmt[:rdfmt.find(':')]
-                    if prefix in prefixes:
-                        rdfmt = rdfmt.replace(prefix + ':', prefixes[prefix])
-                predicate = doc['predicate']
-                predId = doc['predicate']
-                res_type = prefixes[predId]['@type'] if predId in prefixes and '@type' in prefixes[predId] else None
-                if predicate in prefixes:
-                    predicate = prefixes[doc['predicate']]['@id']
+                    if 'ranges' in doc:
+                        range = doc['ranges']
+                    else:
+                        range = None
 
-                    if range is None and '@type' in prefixes[predId] and prefixes[predId]['@type'] != '@id':
-                        range = prefixes[predId]['@type']
-                elif ':' in predicate and predicate.find(':') == predicate.rfind(':'): # this should not happen
-                    prefix = predicate[:predicate.find(':')]
-                    if prefix in prefixes:
-                        if isinstance(prefixes[prefix], str):
-                            predId = predicate
-                            predicate = predicate.replace(prefix + ':', prefixes[prefix])
-                        else:
-                            pred = predicate.replace(':', '')
-
-                            if pred in prefixes:
-                                res_type = prefixes[pred]['@type'] if pred in prefixes and '@type' in prefixes[pred] else None
-                                predId = predicate
-                                predicate = prefixes[pred]['@id']
-
-                                if range is None and '@type' in prefixes[pred] and prefixes[pred]['@type'] != '@id':
-                                    range = prefixes[pred]['@type']
-
-                sources_by_collection.setdefault(c, {"predicates": {}, 'prefixes': {}})
-                sources_by_collection[c]['predicates'].setdefault(predicate, {})
-                sources_by_collection[c]['predicates'][predicate]['@id'] = predId
-                if res_type is not None:
-                    sources_by_collection[c]['predicates'][predicate]['@type'] = res_type
-                for p, v in prefixes.items():
-                    if isinstance(v, str):
-                        sources_by_collection[c]['prefixes'][p] = v
-
-                if range is not None:
-                    if ':' in range and range.find(':') == range.rfind(':'):
-                        prefix = range[:range.find(':')]
+                    rdfmt = doc['rdfmt']
+                    if ':' in rdfmt and rdfmt.find(':') == rdfmt.rfind(':'):
+                        prefix = rdfmt[:rdfmt.find(':')]
                         if prefix in prefixes:
-                            range = range.replace(prefix + ':', prefixes[prefix])
+                            rdfmt = rdfmt.replace(prefix + ':', prefixes[prefix])
+                    predicate = doc['predicate']
+                    predId = doc['predicate']
+                    res_type = prefixes[predId]['@type'] if predId in prefixes and '@type' in prefixes[predId] else None
+                    if predicate in prefixes:
+                        predicate = prefixes[doc['predicate']]['@id']
 
-                    rdfmts_by_collection.setdefault(c, {}).setdefault(rdfmt, {}).setdefault(predicate, []).append(range)
-                    rdfmts_by_collection[c][rdfmt][predicate] = list(set(rdfmts_by_collection[c][rdfmt][predicate]))
+                        if range is None and '@type' in prefixes[predId] and prefixes[predId]['@type'] != '@id':
+                            range = prefixes[predId]['@type']
+                    elif ':' in predicate and predicate.find(':') == predicate.rfind(':'): # this should not happen
+                        prefix = predicate[:predicate.find(':')]
+                        if prefix in prefixes:
+                            if isinstance(prefixes[prefix], str):
+                                predId = predicate
+                                predicate = predicate.replace(prefix + ':', prefixes[prefix])
+                            else:
+                                pred = predicate.replace(':', '')
 
-                else:
-                    rdfmts_by_collection.setdefault(c, {}).setdefault(rdfmt, {})[predicate] = []
+                                if pred in prefixes:
+                                    res_type = prefixes[pred]['@type'] if pred in prefixes and '@type' in prefixes[pred] else None
+                                    predId = predicate
+                                    predicate = prefixes[pred]['@id']
 
+                                    if range is None and '@type' in prefixes[pred] and prefixes[pred]['@type'] != '@id':
+                                        range = prefixes[pred]['@type']
+
+                    sources_by_collection.setdefault(c, {"predicates": {}, 'prefixes': {}})
+                    sources_by_collection[c]['predicates'].setdefault(predicate, {})
+                    sources_by_collection[c]['predicates'][predicate]['@id'] = predId
+                    if res_type is not None:
+                        sources_by_collection[c]['predicates'][predicate]['@type'] = res_type
+                    for p, v in prefixes.items():
+                        if isinstance(v, str):
+                            sources_by_collection[c]['prefixes'][p] = v
+
+                    if range is not None:
+                        if ':' in range and range.find(':') == range.rfind(':'):
+                            prefix = range[:range.find(':')]
+                            if prefix in prefixes:
+                                range = range.replace(prefix + ':', prefixes[prefix])
+
+                        rdfmts_by_collection.setdefault(c, {}).setdefault(rdfmt, {}).setdefault(predicate, []).append(range)
+                        rdfmts_by_collection[c][rdfmt][predicate] = list(set(rdfmts_by_collection[c][rdfmt][predicate]))
+
+                    else:
+                        rdfmts_by_collection.setdefault(c, {}).setdefault(rdfmt, {})[predicate] = []
         datasource.params.update(sources_by_collection)
 
         for c, mts in rdfmts_by_collection.items():
-            rmlsource = RMLSource(datasource.name + '<|>' + c,
+            rmlsource = RMLSource(self.database_name + '<|>' + c,
                                   DataSourceType.MONGODB_LD_FLAT,
                                   dbmstype='MongoDB',
                                   ds_desc={
                                       "jdbcdriver": "",
                                       "collection_name": c,
-                                      'database_name': datasource.name,
-                                      "dbms_version": "4.0.7"
+                                      'database_name': self.database_name,
+                                      "dbms_version": dbms_version
                                   })
             for mt, preds in mts.items():
                 rdfmt = RDFMT(mt, mt, 'typed')

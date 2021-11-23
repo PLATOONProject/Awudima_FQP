@@ -2,12 +2,7 @@ __author__ = "Kemele M. Endris"
 
 from typing import Dict, List
 from awudima.pysparql import Argument, Expression, Triple, Filter, SPARQL
-from awudima.pyrml import DataSourceType
-from awudima.pyrdfmt import RDFMT
-from awudima.pyrdfmt import MTPredicate
 from awudima.pyrdfmt import DataSource
-
-from pprint import pprint
 
 
 class Star2MongoLDF:
@@ -44,23 +39,6 @@ class Star2MongoLDF:
                 finalists.append(c)
         return finalists
 
-    def prepare_lookup(self):
-        lookup = {'$lookup': {
-            'from': 'occupancy',
-            'let': {'bld_id': '$@graph.@id'},
-            'pipeline': [
-                {'$unwind': '$@graph'},
-                {'$unwind': '$@graph.@type'},
-                {'$match': {'$expr': {'$and': [{'$eq': ['$@graph.@id', '$$bld_id']},
-                                               {'$ne': ['$@graph.containsZone', 'null']},
-                                               {'$ne': ['$@graph.containsZone', '']}]}}},
-                {'$project': {'_id': 0, 'zone': '$@graph.containsZone'}}
-            ],
-            'as': 'zones'
-        }
-        }
-        unwind = {'$unwind': '$zones'}
-
     def _translate_filters(self, triple_patterns, collection):
         exprs = []
         for f in self.filters:
@@ -73,11 +51,7 @@ class Star2MongoLDF:
 
         print(exprs)
         print(where_conditions)
-        # if len(where_conditions) > 0:
-        #     if self.child_filter_conditions is not None:
-        #         self.child_filter_conditions.conditions.extend(where_conditions)
-        #     else:
-        #         self.child_filter_conditions = SQLAndCondition(where_conditions)
+
         return where_conditions
 
     def _get_subject_var(self, operand, triple_patterns):
@@ -176,14 +150,9 @@ class Star2MongoLDF:
 
     def _get_term_map_filter_conditions(self, expression_arg, expression, term, variable, collection):
         where_expressions = []
-        sparql_result_template = {}
         if term is not None:
             cond = (term, expression.op, expression_arg)
             where_expressions.append(cond)
-        else:
-            # self.missing_predicates.setdefault(str(expression), []).append(
-            #     expression)
-            pass
 
         return where_expressions
 
@@ -195,7 +164,7 @@ class Star2MongoLDF:
             if predicate_term_uri in rml_source:
                 psources = rml_source[predicate_term_uri]
                 for s in psources:
-                    if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.name:
+                    if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.dsId:
                         if collection == s.ds_desc['collection_name']:
                             if '$dateFromString' in expression_arg:
                                 conv_stage = {'$addFields': {'date_conv_' + variable: expression_arg}}
@@ -219,16 +188,15 @@ class Star2MongoLDF:
                                 elif expression.op == "!=":
                                     operation = '$ne'
                                 match_stage = {'$match': {'$expr': {operation: ['$'+variable + '_value', '$date_conv_' + variable]}}}
-                                print(conv_stage)
-                                print(comp_stage)
-                                print(match_stage)
+#                                print(conv_stage)
+#                                print(comp_stage)
+#                                print(match_stage)
                                 where_expressions.append(conv_stage)
                                 where_expressions.append(comp_stage)
                                 where_expressions.append(match_stage)
         return where_expressions
 
     def translate_to_mongo_ld_flat(self):
-
         queries_per_collection = {}
         first = True
         # triple patterns per collection
@@ -246,7 +214,7 @@ class Star2MongoLDF:
                 for p in rml_source:
                     for s in rml_source[p]:
                         collection = s.ds_desc['collection_name']
-                        if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.name:
+                        if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.dsId:
                             if collection in colls:
                                 continue
                             colls.append(collection)
@@ -258,7 +226,7 @@ class Star2MongoLDF:
                 continue
             psources = rml_source[pred_uri]
             for s in psources:
-                if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.name:
+                if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.dsId:
                     collection = s.ds_desc['collection_name']
                     tps_per_collection.setdefault(collection, []).append(tp)
                     collection_per_tp.setdefault(str(tp), []).append(collection)
@@ -281,7 +249,7 @@ class Star2MongoLDF:
                         subj = triple_pattern.subject
                         if not subj.constant:
                             projections[subj.name[1:]] = '$@graph.@id'
-                            sparql_result_template[subj.name[1:]] = {'type': 'uri', 'value': '', 'source': [self.datasource.name + '<|>' + collection]}
+                            sparql_result_template[subj.name[1:]] = {'type': 'uri', 'value': '', 'source': [self.datasource.dsId + '<|>' + collection]}
                         else:
                             and_matches['@graph.@id'] = SPARQL.getUri(subj, self.prefixes)[1:-1]
                     continue
@@ -291,7 +259,7 @@ class Star2MongoLDF:
                     subj = triple_pattern.subject
                     if not subj.constant:
                         projections[subj.name[1:]] = '$@graph.@id'
-                        sparql_result_template[subj.name[1:]] = {'type': 'uri', 'value': '', 'source': [self.datasource.name + '<|>' + collection]}
+                        sparql_result_template[subj.name[1:]] = {'type': 'uri', 'value': '', 'source': [self.datasource.dsId + '<|>' + collection]}
                     else:
                         and_matches['@graph.@id'] = SPARQL.getUri(subj, self.prefixes)[1:-1]
 
@@ -301,8 +269,7 @@ class Star2MongoLDF:
                     if not obj.constant:
                         proj_alias = obj.name[1:]
                         projections[proj_alias] = self.rdfmtID
-                        # res_template = {proj_alias: {'type': 'uri', 'value': self.rdfmtID}}
-                        sparql_result_template[proj_alias] = {'type': 'uri', 'value': self.rdfmtID, 'source': [self.datasource.name + '<|>' + collection]}
+                        sparql_result_template[proj_alias] = {'type': 'uri', 'value': self.rdfmtID, 'source': [self.datasource.dsId + '<|>' + collection]}
                     else:
                         obj_url = SPARQL.getUri(obj, self.prefixes)[1:-1]
                         and_matches['@graph.@type'] = {'$in': self.url_to_prefixed_vals(obj_url, collection)}
@@ -313,12 +280,12 @@ class Star2MongoLDF:
                         if '@type' in self.datasource.params[collection]['predicates'][pred_uri]:
                             tp = self.datasource.params[collection]['predicates'][pred_uri]['@type']
                             if tp == '@id':
-                                sparql_result_template[proj_alias] = {'type': 'uri', 'value': '', 'source': [self.datasource.name + '<|>' + collection]}
+                                sparql_result_template[proj_alias] = {'type': 'uri', 'value': '', 'source': [self.datasource.dsId + '<|>' + collection]}
                             else:
                                 sparql_result_template[proj_alias] = {'type': 'literal', 'value': '',
-                                                             'datatype': tp, 'source': [self.datasource.name + '<|>' + collection]}
+                                                             'datatype': tp, 'source': [self.datasource.dsId + '<|>' + collection]}
                         else:
-                            sparql_result_template[proj_alias] = {'type': 'literal', 'value': '', 'source': [self.datasource.name + '<|>' + collection]}
+                            sparql_result_template[proj_alias] = {'type': 'literal', 'value': '', 'source': [self.datasource.dsId + '<|>' + collection]}
 
                         if '$expr' in and_matches:
                             and_matches['$expr']['$and'].extend(
@@ -355,7 +322,6 @@ class Star2MongoLDF:
         outer_projection = {}
         sparql_result_templates = {}
         filter_stages = []
-        # partial_mats = [tp for tp in collection_per_tp if len(collection_per_tp[tp]) < len(collections)]
         if len(full_matches) > 0:
             outer_collection = full_matches[0]
             full_matches.remove(outer_collection)
@@ -433,62 +399,3 @@ class Star2MongoLDF:
         projects = {'$project': outer_projection}
         outer_query.append(projects)
         return outer_query, outer_collection, sparql_result_templates
-
-#
-# if __name__ == '__main__':
-#
-#     from pysparql import Argument, Triple
-#     from pyrdfmt.datasource import DataSource
-#     from pyrdfmt.federation import Federation
-#
-#     fed1 = Federation.load_from_json(
-#         '/mappings/platoonfed-pilot3a-conf.json')
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/platoon/hasCloudOpacity>', True)
-#     obj = Argument('?cop', False)
-#     tp1 = Triple(sub, pred, obj)
-#     print(tp1)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/platoon/hasDirectNormalIrradiance>', True)
-#     obj = Argument('?directNormalIrradiance', False)
-#     tp2 = Triple(sub, pred, obj)
-#     print(tp2)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/bot#containsZone>', True)
-#     obj = Argument('?zone', False)
-#     tp3 = Triple(sub, pred, obj)
-#     print(tp3)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<http://www.w3.org/2000/01/rdf-schema#label>', True)
-#     obj = Argument('?label', False)
-#     tp4 = Triple(sub, pred, obj)
-#     print(tp4)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/platoon/hasGlobalHorizontalIrradiance>', True)
-#     obj = Argument('?globalHorIrradiance', False)
-#     tp5 = Triple(sub, pred, obj)
-#     print(tp5)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/platoon/hasDirectHorizontalIrradiance>', True)
-#     obj = Argument('?directHorIrradiance', False)
-#     tp6 = Triple(sub, pred, obj)
-#     print(tp6)
-#
-#     sub = Argument("?building", False)
-#     pred = Argument('<https://w3id.org/platoon/hasDiffuseHorizontalIrradiance>', True)
-#     obj = Argument('?diffHorIrradiance', False)
-#     tp7 = Triple(sub, pred, obj)
-#     print(tp7)
-#     smldf = Star2MongoLDF('weather-estimated-actuals',
-#                           fed1.rdfmts_obj['https://w3id.org/bot#Building'],
-#                           [tp1, tp2, tp3, tp4, tp5, tp6, tp7],
-#                           [],
-#                           ['?building', '?cop', '?directNormalIrradiance'],
-#                           {},
-#                           [d for d in fed1.datasources][0])
