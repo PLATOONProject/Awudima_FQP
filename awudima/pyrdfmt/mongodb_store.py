@@ -96,6 +96,7 @@ class MongoLDFlattenRDFMT:
     def extract_params(self, datasource):
         self.params = datasource.params
         self.url = datasource.url
+        self.dsId = datasource.dsId
         if datasource.params is not None and len(datasource.params) > 0:
             if isinstance(datasource.params, dict):
                 self.username = datasource.params['username'] if 'username' in datasource.params else None
@@ -228,7 +229,7 @@ class MongoLDFlattenRDFMT:
         datasource.params.update(sources_by_collection)
 
         for c, mts in rdfmts_by_collection.items():
-            rmlsource = RMLSource(self.database_name + '<|>' + c,
+            rmlsource = RMLSource(self.dsId + '<|>' + c,
                                   DataSourceType.MONGODB_LD_FLAT,
                                   dbmstype='MongoDB',
                                   ds_desc={
