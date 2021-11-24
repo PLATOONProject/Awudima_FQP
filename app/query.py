@@ -91,7 +91,10 @@ def sparql():
 def configure():
     if request.method == 'GET' or request.method == 'POST':
         try:
-            conf = request.args.get("federation", {}) if request.method == 'GET' else request.values.get("federation", {})
+            if 'federation' in request.files:
+                conf = request.files['federation'].read()
+            else:
+                conf = request.args.get("federation", {}) if request.method == 'GET' else request.values.get("federation", {})
             fed = json.loads(conf)
             federation = Federation.config(fed)
             if not federation.rdfmts:
