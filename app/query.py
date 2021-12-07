@@ -1,5 +1,5 @@
 from flask import (
-    Blueprint, request
+    Blueprint, g, request
 )
 import os
 from flask.json import jsonify
@@ -31,6 +31,7 @@ def sparql():
     if request.method == 'GET' or request.method == 'POST':
         try:
             query = request.args.get("query", None) if request.method == 'GET' else request.values.get("query", None)
+            g.collection = request.args.get("collection", None) if request.method == 'GET' else request.values.get("collection", None)
             if os.path.exists(configfile):
                 federation = Federation.config(configfile)
             else:

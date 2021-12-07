@@ -1,5 +1,6 @@
 __author__ = "Kemele M. Endris"
 
+from flask import g
 from typing import Dict, List
 from awudima.pysparql import Argument, Expression, Triple, Filter, SPARQL
 from awudima.pyrdfmt import DataSource
@@ -214,6 +215,8 @@ class Star2MongoLDF:
                 for p in rml_source:
                     for s in rml_source[p]:
                         collection = s.ds_desc['collection_name']
+                        if g.collection and not g.collection == collection:
+                            continue
                         if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.dsId:
                             if collection in colls:
                                 continue
@@ -228,6 +231,8 @@ class Star2MongoLDF:
             for s in psources:
                 if s.dstype.value == 'MONGODB_LD_FLAT' and s.name.split('<|>')[0] == self.datasource.dsId:
                     collection = s.ds_desc['collection_name']
+                    if g.collection and not g.collection == collection:
+                        continue
                     tps_per_collection.setdefault(collection, []).append(tp)
                     collection_per_tp.setdefault(str(tp), []).append(collection)
                     collection_per_tp[str(tp)] = list(set(collection_per_tp[str(tp)]))
