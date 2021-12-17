@@ -174,29 +174,32 @@ class MongoLDFlatTranslator(MongoTranslator):
         # source = self.config.datasources_obj[self.datasource.dsId]
         star_rdfmts = star['datasources'][self.datasource.dsId]
         star_query = None
-        outer_collection = None
+        outer_collection = []
         for mtID, mtpredicates in star_rdfmts.items():
             rdfmt = self.config.rdfmts_obj[mtID]
             # collections = self.get_collection_names(rdfmt, mtpredicates)
             # for collection_name in collections:
-            star_query, outer_collection, sparql_result_template = self.translate_const_predicates(rdfmt, star['triples'], star['variables'])
-            collection_queries[outer_collection] = star_query
-            sparql_result_templates.update(sparql_result_template)
+            star_query, collections, sparql_result_template = self.translate_const_predicates(rdfmt, star['triples'], star['variables'])
+            outer_collection.extend(collections)
+#            collection_queries[outer_collection] = star_query
+#            sparql_result_templates.update(sparql_result_template)
 
-        if len(collection_queries) == 1:
-            outer_collection = list(collection_queries.keys())[0]
-            return collection_queries[outer_collection], outer_collection, sparql_result_templates
-        elif len(collection_queries) > 1:
-            colls = list(collection_queries.keys())
-            outer_collection = colls[0]
-            star_query = collection_queries[outer_collection]
-            for coll in colls[1:]:
+        return star_query, outer_collection, sparql_result_template
 
-                star_query.append(
-                    {"$unionWith": {"coll": coll, "pipeline": collection_queries[coll]}}
-                )
-            return star_query, outer_collection, sparql_result_templates
-        return star_query, outer_collection, sparql_result_templates
+        # if len(collection_queries) == 1:
+        #     outer_collection = list(collection_queries.keys())[0]
+        #     return collection_queries[outer_collection], outer_collection, sparql_result_templates
+        # elif len(collection_queries) > 1:
+        #     colls = list(collection_queries.keys())
+        #     outer_collection = colls[0]
+        #     star_query = collection_queries[outer_collection]
+        #     for coll in colls[1:]:
+        #
+        #         star_query.append(
+        #             {"$unionWith": {"coll": coll, "pipeline": collection_queries[coll]}}
+        #         )
+        #     return star_query, outer_collection, sparql_result_templates
+        # return star_query, outer_collection, sparql_result_templates
 
     def translate_const_predicates(self, rdfmt, triple_patterns: List, variables: List[str]):
 

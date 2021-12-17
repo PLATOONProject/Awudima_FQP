@@ -63,7 +63,6 @@ class MongoDBWrapper:
         return mongo_client
 
     def executeQuery(self, mongo_ql, queue, sparql_result_template, limit=-1, offset=0):
-
         if self.database_name is None:
             queue.put('EOF')
             return
@@ -78,42 +77,92 @@ class MongoDBWrapper:
             queue.put('EOF')
             return
 
-        db = mongo_client.get_database(self.database_name)
-        collection = db.get_collection(coll_name)
-
-        card = 0
-        if limit == -1:
-            limit = 10000
-        if offset == -1:
-            offset = 0
-
-        logger.info(mongo_ql)
         try:
-            # rs = time()
-            while True:
-                query_copy = [p for p in pipeline]
-                query_copy.extend([{"$skip": offset}, {"$limit": limit}])
-                result = collection.aggregate(query_copy, useCursor=True, batchSize=1000, allowDiskUse=True)
+            db = mongo_client.get_database(self.database_name)
+            for col_name in mongo_ql['collection']:
+                collection = db.get_collection(col_name)
+                result = collection.aggregate(pipeline, useCursor=True, batchSize=1000, allowDiskUse=True)
                 cardinality = self.process_result(result, queue, sparql_result_template)
-                card += cardinality
-                # if (time()-rs) > 20:
-                #     print(card, 'results found -..')
-                if cardinality < limit:
-                    break
-                offset = offset + limit
-            logger.info("Running query: " + str(mongo_ql) + " is DONE with cardinality: " + str(card))
         except IOError as ie:
             print("IO ERROR:", ie)
             logger.error("IOError while running query: " + str(ie))
-            pass
         except Exception as e:
-            print("EXception: ", e)
+            print("Exception: ", e)
             logger.error("Exception while running query: " + str(e))
-            pass
+        finally:
+            queue.put('EOF')
+            return
 
-        queue.put("EOF")
-        # print(mongo_ql)
-        # print('DONE')
+#         collection = db.get_collection(coll_name)
+#
+#         card = 0
+#         if limit == -1:
+#             limit = 10000
+#         if offset == -1:
+#             offset = 0
+#
+#         logger.info(mongo_ql)
+#         try:
+#             # rs = time()
+#             while True:
+#                 query_copy = [p for p in pipeline]
+#                 query_copy.extend([{"$skip": offset}, {"$limit": limit}])
+#                 #result = collection.aggregate(query_copy, useCursor=True, batchSize=1000, allowDiskUse=True)
+#                 collection = db.get_collection("scada_10min_converter")
+#                 result = collection.aggregate([{'$unwind': '$@graph'},
+#                                                {'$match': {'$expr': {'$and': [{'$ne': ['$@graph.evaluatedSimpleValue', 'null']},
+#                                                                               {'$ne': ['$@graph.evaluatedSimpleValue', '']}]},
+#                                                            '@graph.@type': {'$in': ['seas:TemperatureEvaluation']}}},
+#                                                {'$project': {'_id': 0, 'label': '$@graph.evaluatedSimpleValue', 'windfarm': '$@graph.@id'}}], useCursor=True, batchSize=1000, allowDiskUse=True)
+#                 result = collection.aggregate([
+#     {'$unwind': '$@graph'},
+#                     {'$match': {"@graph.inXSDDateTime": {'$gte': "2020-11-17T22:20:00Z", '$lte': "2022-11-29T22:20:00Z"}}},
+#                     {'$match': {"@graph.@type": {'$in': ['time:Instant']}}},
+#     {'$project': {'_id': 0, 'instance': '$@graph.@id', 'time': '$@graph.inXSDDateTime', 'type': '$@graph.@type'}}
+#   ], useCursor=True, batchSize=1000, allowDiskUse=True)
+#
+#
+#                 ## alternative
+#                 result = collection.aggregate([
+#                     {'$unwind': '$@graph'},
+#                     {'$match':
+#                         {
+#                             '$and': [
+#                                 {"@graph.inXSDDateTime": {'$gte': "2020-11-17T22:20:00Z",
+#                                                           '$lte': "2022-11-29T22:20:00Z"}},
+#                                 {"@graph.@type": {'$in': ['time:Instant']}}
+#                             ]
+#                         }},
+#                     {'$project': {'_id': 0, 'instance': '$@graph.@id', 'time': '$@graph.inXSDDateTime',
+#                                   'type': '$@graph.@type'}}
+#                 ], useCursor=True, batchSize=1000, allowDiskUse=True)
+#
+#
+# #                result = collection.find({'$expr': {'$and': [{'$ne': ['$@graph.seas:evaluatedSimpleValue', 'null']},
+# #                                                             {'$ne': ['$@graph.seas:evaluatedSimpleValue', '']}]},
+# #                                          '@graph.@type': {'$in': ['seas:TemperatureEvaluation']}}, {'_id': 0,
+# #               'label': '$@graph.seas:evaluatedSimpleValue',
+# #               'windfarm': '$@graph.@id'})
+#                 cardinality = self.process_result(result, queue, sparql_result_template)
+#                 card += cardinality
+#                 # if (time()-rs) > 20:
+#                 #     print(card, 'results found -..')
+#                 if cardinality < limit:
+#                     break
+#                 offset = offset + limit
+#             logger.info("Running query: " + str(mongo_ql) + " is DONE with cardinality: " + str(card))
+#         except IOError as ie:
+#             print("IO ERROR:", ie)
+#             logger.error("IOError while running query: " + str(ie))
+#             pass
+#         except Exception as e:
+#             print("EXception: ", e)
+#             logger.error("Exception while running query: " + str(e))
+#             pass
+#
+#         queue.put("EOF")
+#         # print(mongo_ql)
+#         # print('DONE')
 
     def process_result(self, results, queue, sparql_result_tempalte: dict):
         if results is None:
@@ -122,7 +171,7 @@ class MongoDBWrapper:
         c = 0
         # from pprint import pprint
         for doc in results:
-            # pprint(doc)
+            # print("res:", doc, "\n")
             c += 1
             row = {}
             res = sparql_result_tempalte.copy()

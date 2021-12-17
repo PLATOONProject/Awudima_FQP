@@ -321,86 +321,99 @@ class Star2MongoLDF:
         first = True
         outer_collection = None
 
-        unwinds = [{'$unwind': '$@graph'},
-                   {'$unwind': '$@graph.@type'}]
-        outer_query = unwinds
-        outer_projection = {}
+        # new optimized query translation
+        if len(full_matches) < 1:
+            return [], [], []
+
+        query = [{'$unwind': '$@graph'}, {'$match': queries_per_collection[full_matches[0]]['$match']}]
+        for stage in queries_per_collection[full_matches[0]]['filter_stages']:
+            query.append(stage)
+        query.append({'$project': queries_per_collection[full_matches[0]]['$project']})
         sparql_result_templates = {}
-        filter_stages = []
-        if len(full_matches) > 0:
-            outer_collection = full_matches[0]
-            full_matches.remove(outer_collection)
-            query = queries_per_collection[outer_collection]
-            outer_projection = query['$project']
-            match = {'$match': query['$match']}
-            outer_query.append(match)
-            filter_stages = query['filter_stages']
-            sparql_result_templates.update(query['result_temp'])
+        sparql_result_templates.update(queries_per_collection[full_matches[0]]['result_temp'])
+        return query, full_matches, sparql_result_templates
 
-            first = False
-
-        i = 0
-        for c, query in queries_per_collection.items():
-            if first:
-                outer_collection = c
-                outer_projection = query['$project']
-                match = {'$match': query['$match']}
-                outer_query.append(match)
-                filter_stages = query['filter_stages']
-                sparql_result_templates.update(query['result_temp'])
-                first = False
-                continue
-            # In case of full matching collection is already set
-            if c == outer_collection:
-                continue
-
-            sparql_result_templates.update(query['result_temp'])
-
-            if c not in full_matches:
-                query['$match']['$expr']['$and'].append({'$eq': ['$@graph.@id', '$$v' + str(i)]})
-                lookup = {
-                    '$lookup': {
-                        'from': c,
-                        'let': {'v' + str(i): '$@graph.@id'},
-                        'pipeline': [
-                            {'$unwind': '$@graph'},
-                            {'$unwind': '$@graph.@type'},
-                            {'$match': query['$match']}
-                        ],
-                        'as': 'joinValues' + str(i)
-                    }
-                }
-                for stage in query['filter_stages']:
-                    lookup['$lookup']['pipeline'].append(stage)
-
-                lookup['$lookup']['pipeline'].append({'$project': query['$project']})
-
-                outer_query.append(lookup)
-                outer_query.append({'$unwind': '$joinValues' + str(i)})
-                for p, v in query['$project'].items():
-                    if p == '_id':
-                        continue
-                    outer_projection[p] = '$joinValues' + str(i) + '.' + p
-            else:
-                unionwith = {"$unionWith": {
-                            "coll": c,
-                            "pipeline": [
-                                    {'$unwind': '$@graph'},
-                                    {'$unwind': '$@graph.@type'},
-                                    {'$match': query['$match']}
-                                ]}}
-                for stage in query['filter_stages']:
-                    unionwith['$unionWith']['pipeline'].append(stage)
-
-                unionwith['$unionWith']['pipeline'].append({'$project': query['$project']})
-
-                outer_query.append(unionwith)
-
-            i += 1
-        # print(outer_collection)
-        # print(outer_projection)
-        for stage in filter_stages:
-            outer_query.append(stage)
-        projects = {'$project': outer_projection}
-        outer_query.append(projects)
-        return outer_query, outer_collection, sparql_result_templates
+        # # old query translation
+        # unwinds = [{'$unwind': '$@graph'},
+        #            {'$unwind': '$@graph.@type'}]
+        # outer_query = unwinds
+        # outer_projection = {}
+        # sparql_result_templates = {}
+        # filter_stages = []
+        # if len(full_matches) > 0:
+        #     outer_collection = full_matches[0]
+        #     full_matches.remove(outer_collection)
+        #     query = queries_per_collection[outer_collection]
+        #     outer_projection = query['$project']
+        #     match = {'$match': query['$match']}
+        #     outer_query.append(match)
+        #     filter_stages = query['filter_stages']
+        #     sparql_result_templates.update(query['result_temp'])
+        #
+        #     first = False
+        #
+        # i = 0
+        # for c, query in queries_per_collection.items():
+        #     if first:
+        #         outer_collection = c
+        #         outer_projection = query['$project']
+        #         match = {'$match': query['$match']}
+        #         outer_query.append(match)
+        #         filter_stages = query['filter_stages']
+        #         sparql_result_templates.update(query['result_temp'])
+        #         first = False
+        #         continue
+        #     # In case of full matching collection is already set
+        #     if c == outer_collection:
+        #         continue
+        #
+        #     sparql_result_templates.update(query['result_temp'])
+        #
+        #     if c not in full_matches:
+        #         query['$match']['$expr']['$and'].append({'$eq': ['$@graph.@id', '$$v' + str(i)]})
+        #         lookup = {
+        #             '$lookup': {
+        #                 'from': c,
+        #                 'let': {'v' + str(i): '$@graph.@id'},
+        #                 'pipeline': [
+        #                     {'$unwind': '$@graph'},
+        #                     {'$unwind': '$@graph.@type'},
+        #                     {'$match': query['$match']}
+        #                 ],
+        #                 'as': 'joinValues' + str(i)
+        #             }
+        #         }
+        #         for stage in query['filter_stages']:
+        #             lookup['$lookup']['pipeline'].append(stage)
+        #
+        #         lookup['$lookup']['pipeline'].append({'$project': query['$project']})
+        #
+        #         outer_query.append(lookup)
+        #         outer_query.append({'$unwind': '$joinValues' + str(i)})
+        #         for p, v in query['$project'].items():
+        #             if p == '_id':
+        #                 continue
+        #             outer_projection[p] = '$joinValues' + str(i) + '.' + p
+        #     else:
+        #         unionwith = {"$unionWith": {
+        #                     "coll": c,
+        #                     "pipeline": [
+        #                             {'$unwind': '$@graph'},
+        #                             {'$unwind': '$@graph.@type'},
+        #                             {'$match': query['$match']}
+        #                         ]}}
+        #         for stage in query['filter_stages']:
+        #             unionwith['$unionWith']['pipeline'].append(stage)
+        #
+        #         unionwith['$unionWith']['pipeline'].append({'$project': query['$project']})
+        #
+        #         outer_query.append(unionwith)
+        #
+        #     i += 1
+        # # print(outer_collection)
+        # # print(outer_projection)
+        # for stage in filter_stages:
+        #     outer_query.append(stage)
+        # projects = {'$project': outer_projection}
+        # outer_query.append(projects)
+        # return outer_query, outer_collection, sparql_result_templates
