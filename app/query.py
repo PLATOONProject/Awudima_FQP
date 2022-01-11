@@ -31,6 +31,17 @@ def sparql():
     if request.method == 'GET' or request.method == 'POST':
         try:
             query = request.args.get("query", None) if request.method == 'GET' else request.values.get("query", None)
+            if query is None:
+                return jsonify({"head": {
+                    "vars": []
+                },
+                    "results": {
+                        "bindings": []
+                    },
+                    "message": "No SPARQL query found in parameter 'query'",
+                    "query": "None",
+                    "error": "No SPARQL query found"})
+
             g.collection = request.args.get("collection", None) if request.method == 'GET' else request.values.get("collection", None)
             if os.path.exists(configfile):
                 federation = Federation.config(configfile)
