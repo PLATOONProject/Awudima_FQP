@@ -80,9 +80,10 @@ class MongoDBWrapper:
         try:
             db = mongo_client.get_database(self.database_name)
             for col_name in mongo_ql['collection']:
+                source = db_name + '<|>' + col_name
                 collection = db.get_collection(col_name)
                 result = collection.aggregate(pipeline, useCursor=True, batchSize=1000, allowDiskUse=True)
-                cardinality = self.process_result(result, queue, sparql_result_template)
+                cardinality = self.process_result(result, queue, sparql_result_template, source)
         except IOError as ie:
             print("IO ERROR:", ie)
             logger.error("IOError while running query: " + str(ie))
@@ -164,17 +165,17 @@ class MongoDBWrapper:
 #         # print(mongo_ql)
 #         # print('DONE')
 
-    def process_result(self, results, queue, sparql_result_tempalte: dict):
+    def process_result(self, results, queue, sparql_result_template: dict, source: str):
         if results is None:
             print("empty results")
             return 0
         c = 0
-        # from pprint import pprint
+
         for doc in results:
             # print("res:", doc, "\n")
             c += 1
             row = {}
-            res = sparql_result_tempalte.copy()
+            res = sparql_result_template.copy()
             skip = False
             for k, v in doc.items():
                 row[k] = v
@@ -182,8 +183,9 @@ class MongoDBWrapper:
                 if row[k] == 'null':
                     skip = True
                     break
-                if k in sparql_result_tempalte:
+                if k in sparql_result_template:
                     value = str(row[k])
+                    res[k]['source'] = [source]
                     try:
                         if res[k]['type'] == 'uri':
                             if len(value) > 2 and '_:' in value[:3]:
