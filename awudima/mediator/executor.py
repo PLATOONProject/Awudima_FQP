@@ -150,7 +150,7 @@ class AwudimaFQP(object):
                 self.__retrieved_results = len(res)
 
                 if len(self.decomposition.args) == 0:
-                    from awudima.pysparql import parser as queryParser
+                    from awudima.pysparql import queryParser
                     query = queryParser.parse(self.sparql_query)
                     self.__result_buffer['head']['vars'] = query.getVars()
                 else:
@@ -166,7 +166,7 @@ class AwudimaFQP(object):
                 self.__retrieved_results = len(res)
 
                 if len(self.decomposition.args) == 0:
-                    from awudima.pysparql import parser as queryParser
+                    from awudima.pysparql import queryParser
                     query = queryParser.parse(self.sparql_query)
                     self.__result_buffer['head']['vars'] = query.getVars()
                 else:
@@ -201,7 +201,7 @@ class AwudimaFQP(object):
                     self.__retrieved_results = 0
 
                     if len(self.decomposition.args) == 0:
-                        from awudima.pysparql import parser as queryParser
+                        from awudima.pysparql import queryParser
                         query = queryParser.parse(self.sparql_query)
                         self.__result_buffer['head']['vars'] = query.getVars()
                     else:

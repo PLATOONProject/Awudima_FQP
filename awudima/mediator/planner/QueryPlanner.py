@@ -18,7 +18,6 @@ from awudima.pysparql import Optional
 from awudima.mediator.utilities import *
 from awudima.pysparql import Service, UnionBlock, JoinBlock
 from awudima.mediator.LogicalPlan import Node, Leaf
-from awudima.pysparql import parser as queryParser
 
 
 class AwudimaPlanner(object):

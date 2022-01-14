@@ -4,7 +4,7 @@ __author__ = 'Kemele M. Endris'
 from typing import List
 
 from awudima.pysparql import SPARQL as utils
-from awudima.pysparql import parser as queryParser
+from awudima.pysparql import queryParser
 from awudima.pysparql import Triple
 from awudima.pysparql import Filter, Optional
 from awudima.mediator.utilities import *
@@ -193,11 +193,7 @@ class AwudimaDecomposer(object):
         :param star: list of triple patterns
         :return: list of predicates
         """
-
-        preds = [utils.getUri(tr.predicate, self.prefixes)[1:-1]
-                 for tr in star if tr.predicate.constant]
-
-        return preds
+        return [utils.getUri(tr.predicate, self.prefixes)[1:-1] for tr in star if tr.predicate.constant]
 
     def get_pred_objs(self, star):
         """

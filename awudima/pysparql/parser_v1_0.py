@@ -1,6 +1,8 @@
 
 __author__ = 'Kemele M. Endris'
 
+import urllib.parse
+
 from ply import lex, yacc
 
 from awudima.pysparql.model import *
@@ -225,7 +227,6 @@ def p_construct_query_0(p):
 
 
 def get_triple_patterns(ub):
-
     triplepatterns = []
 
     for jb in ub.triples:
@@ -1245,7 +1246,6 @@ xstring = ""
 
 
 def getBGPVars(bgp):
-
     vars = []
     for tr in bgp:
         if not tr.subject.constant:
@@ -1260,8 +1260,8 @@ def getBGPVars(bgp):
 
 def parse(string):
     global xstring
-    xstring = string
-    query = parser.parse(string, lexer=lexer)
+    xstring = urllib.parse.unquote(string)
+    query = parser.parse(xstring, lexer=lexer)
     if isinstance(query, Query):
         if query.query_type == 1:
             temvars = set(getBGPVars(query.args))
@@ -1270,4 +1270,3 @@ def parse(string):
                 print('INVALID query! CONSTRUCT TEMPLATE contains variables that are not defined in the body of the Query.')
                 return None
     return query
-

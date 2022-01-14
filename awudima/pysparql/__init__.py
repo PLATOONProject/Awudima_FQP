@@ -2,7 +2,6 @@ from awudima.pysparql.parser_v1_0 import (
     SPARQL,
     Query,
     Service,
-    parser,
     JoinBlock,
     Triple,
     UnionBlock,
@@ -11,5 +10,8 @@ from awudima.pysparql.parser_v1_0 import (
     Filter,
     Optional
 )
+
+import awudima.pysparql.parser_v1_0 as queryParser
+
 from awudima.pysparql.wrapper import SPARQLEndpointWrapper
 
