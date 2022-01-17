@@ -5,7 +5,12 @@ from requests.utils import requote_uri
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class MongoDBWrapper:
@@ -84,6 +89,7 @@ class MongoDBWrapper:
                 collection = db.get_collection(col_name)
                 result = collection.aggregate(pipeline, useCursor=True, batchSize=1000, allowDiskUse=True)
                 cardinality = self.process_result(result, queue, sparql_result_template, source)
+                logger.debug("collection: " + str(col_name) + "   --   answers: " + str(cardinality))
         except IOError as ie:
             print("IO ERROR:", ie)
             logger.error("IOError while running query: " + str(ie))

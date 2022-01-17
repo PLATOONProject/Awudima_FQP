@@ -8,9 +8,9 @@ from awudima.pyrdfmt import Federation
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
-handler.setLevel(logging.INFO)
+handler.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
@@ -43,6 +43,7 @@ class AwudimaFQP(object):
         try:
             mwp = AwudimaPlanner(sparql_query, decompositions, self.federation, pushdownjoins=pushdownssqjoins)
             plan = mwp.create_physical_plan()
+            logger.debug("Generated physical plan: " + str(plan))
         except Exception as e:
             print("Exception while creating physical plan for the given query: ", sparql_query)
             print(e)
