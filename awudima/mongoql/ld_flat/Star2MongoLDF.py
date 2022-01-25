@@ -6,6 +6,15 @@ from awudima.pysparql import Argument, Expression, Triple, Filter, SPARQL
 from awudima.pyrdfmt import DataSource
 
 
+try:
+    __globals__ = g.collection
+except RuntimeError as e:
+    class Global:
+        collection = None
+
+    g = Global()
+
+
 class Star2MongoLDF:
 
     def __init__(self,
@@ -50,8 +59,8 @@ class Star2MongoLDF:
             where_exprs = self._translate_filter_expression(e, triple_patterns, collection)
             where_conditions.extend(where_exprs)
 
-        print(exprs)
-        print(where_conditions)
+        # print(exprs)
+        # print(where_conditions)
 
         return where_conditions
 
@@ -70,7 +79,7 @@ class Star2MongoLDF:
         where_expressions = []
         if expression.op in SPARQL.unaryFunctor:
             if expression.op == 'xsd:dateTime':
-                print(expression.op, expression.left.name)
+                # print(expression.op, expression.left.name)
                 if isinstance(expression.left, Argument):
                     if not expression.left.constant:
                         return {
