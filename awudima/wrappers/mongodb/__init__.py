@@ -35,23 +35,13 @@ class MongoDBWrapper:
                             self.password = params[1]
                         if 'database' == params[0]:
                             self.database_name = params[1]
-        if ':' in self.url:
-            self.host, self.port = self.url.split(':')
-            try:
-                self.port = int(self.port)
-            except:
-                self.port = 27017
-        else:
-            self.host = self.url
-            self.port = 27017
 
     def init_connection(self):
         try:
             if self.username is None:
-                mongo_client = MongoClient(host=self.host, port=self.port)
+                mongo_client = MongoClient(self.url)
             else:
-                mongo_client = MongoClient(host=self.host,
-                                           port=self.port,
+                mongo_client = MongoClient(self.url,
                                            username=self.username,
                                            password=self.password)
 
